@@ -3,7 +3,6 @@ RG_TAGS={"Product" : "Teacher services cloud", "Service Offering" : "Teacher ser
 REGION=UK South
 SERVICE_NAME=get-into-teaching-crm
 SERVICE_SHORT=gitcrm
-DOCKER_REPOSITORY=ghcr.io/dfe-digital/not-set-DOCKER_REPOSITORY
 
 help:
 	@grep -E '^[a-zA-Z\._\-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -17,9 +16,6 @@ review: test-cluster
 production: production-cluster
 	$(if $(or ${SKIP_CONFIRM}, ${CONFIRM_PRODUCTION}), , $(error Missing CONFIRM_PRODUCTION=yes))
 	$(eval include global_config/production.sh)
-
-domains:
-	$(eval include global_config/domains.sh)
 
 composed-variables:
 	$(eval RESOURCE_GROUP_NAME=${AZURE_RESOURCE_PREFIX}-${SERVICE_SHORT}-${CONFIG_SHORT}-rg)
@@ -36,7 +32,6 @@ set-azure-account:
 	[ "${SKIP_AZURE_LOGIN}" != "true" ] && az account set -s ${AZURE_SUBSCRIPTION} || true
 
 terraform-init: composed-variables set-azure-account
-	$(if ${DOCKER_IMAGE_TAG}, , $(eval DOCKER_IMAGE_TAG=main))
 
 	rm -rf terraform/application/vendor/modules/aks
 	git -c advice.detachedHead=false clone --depth=1 --single-branch --branch ${TERRAFORM_MODULES_TAG} https://github.com/DFE-Digital/terraform-modules.git terraform/application/vendor/modules/aks
@@ -52,7 +47,6 @@ terraform-init: composed-variables set-azure-account
 	$(eval export TF_VAR_config_short=${CONFIG_SHORT})
 	$(eval export TF_VAR_service_name=${SERVICE_NAME})
 	$(eval export TF_VAR_service_short=${SERVICE_SHORT})
-	$(eval export TF_VAR_docker_image=${DOCKER_REPOSITORY}:${DOCKER_IMAGE_TAG})
 
 terraform-plan: terraform-init
 	terraform -chdir=terraform/application plan -var-file "config/${CONFIG}.tfvars.json"
@@ -137,35 +131,9 @@ production-cluster:
 	$(eval CLUSTER_RESOURCE_GROUP_NAME=s189p01-tsc-pd-rg)
 	$(eval CLUSTER_NAME=s189p01-tsc-production-aks)
 
-get-cluster-credentials: set-azure-account
-	az aks get-credentials --overwrite-existing -g ${CLUSTER_RESOURCE_GROUP_NAME} -n ${CLUSTER_NAME}
-	kubelogin convert-kubeconfig -l $(if ${AAD_LOGIN_METHOD},${AAD_LOGIN_METHOD},azurecli)
-
 bin/konduit.sh:
 	curl -s https://raw.githubusercontent.com/DFE-Digital/teacher-services-cloud/main/scripts/konduit.sh -o bin/konduit.sh \
 		&& chmod +x bin/konduit.sh
-
-maintenance-image-push:
-	$(if ${GITHUB_TOKEN},, $(error Provide a valid Github token with write:packages permissions as GITHUB_TOKEN variable))
-	$(if ${MAINTENANCE_IMAGE_TAG},, $(eval export MAINTENANCE_IMAGE_TAG=$(shell date +%s)))
-	docker build -t ghcr.io/dfe-digital/${SERVICE_NAME}-maintenance:${MAINTENANCE_IMAGE_TAG} maintenance_page
-	echo ${GITHUB_TOKEN} | docker login ghcr.io -u USERNAME --password-stdin
-	docker push ghcr.io/dfe-digital/${SERVICE_NAME}-maintenance:${MAINTENANCE_IMAGE_TAG}
-
-maintenance-fail-over: get-cluster-credentials
-	$(eval export CONFIG)
-	./maintenance_page/scripts/failover.sh
-
-enable-maintenance: maintenance-image-push maintenance-fail-over
-
-disable-maintenance: get-cluster-credentials
-	$(eval export CONFIG)
-	./maintenance_page/scripts/failback.sh
-
-db-seed: get-cluster-credentials # Example db seed for review apps, modify as required
-	$(if $(PR_NUMBER), , $(error can only run with PR_NUMBER))
-	$(eval NAMESPACE=$(shell jq -r '.namespace' terraform/application/config/$(CONFIG).tfvars.json))
-	kubectl -n ${NAMESPACE} exec deployment/${SERVICE_NAME}-pr-${PR_NUMBER} -- /bin/sh -c "cd /app && bundle exec rake db:seed"
 
 action-group: set-azure-account # make production action-group ACTION_GROUP_EMAIL=notificationemail@domain.com . Must be run before setting enable_monitoring=true. Use any non-prod environment to create in the test subscription.
 	$(if $(ACTION_GROUP_EMAIL), , $(error Please specify a notification email for the action group))
@@ -199,27 +167,6 @@ disable-pglogs: composed-variables set-pgserver set-azure-account
 	az postgres flexible-server parameter set --resource-group ${RESOURCE_GROUP_NAME} --server-name ${SERVERNAME} --name logfiles.download_enable --value off
 	echo "New Value"
 	az postgres flexible-server parameter show --resource-group ${RESOURCE_GROUP_NAME} --server-name ${SERVERNAME} --name logfiles.download_enable --query value
-
-show-service: get-cluster-credentials
-	$(if $(PR_NUMBER), $(eval export DSUFFIX="-pr-${PR_NUMBER}"), $(eval export DSUFFIX="-${CONFIG}") )
-	$(eval NAMESPACE=$(shell jq -r '.namespace' terraform/application/config/$(CONFIG).tfvars.json))
-	echo "Show service deployments"
-	kubectl -n ${NAMESPACE} get deployment/${SERVICE_NAME}${DSUFFIX}
-	kubectl -n ${NAMESPACE} get deployment/${SERVICE_NAME}${DSUFFIX}-worker
-
-scale-app: get-cluster-credentials
-	$(if $(PR_NUMBER), $(eval export DSUFFIX="-pr-${PR_NUMBER}"), $(eval export DSUFFIX="-${CONFIG}") )
-	$(if $(REPLICAS),,$(error Missing REPLICAS))
-	$(eval NAMESPACE=$(shell jq -r '.namespace' terraform/application/config/$(CONFIG).tfvars.json))
-	echo "Scaling app to ${REPLICAS}"
-	kubectl -n ${NAMESPACE} scale deployment/${SERVICE_NAME}${DSUFFIX} --replicas ${REPLICAS}
-
-scale-worker: get-cluster-credentials
-	$(if $(PR_NUMBER), $(eval export DSUFFIX="-pr-${PR_NUMBER}"), $(eval export DSUFFIX="-${CONFIG}") )
-	$(if $(REPLICAS),,$(error Missing REPLICAS))
-	$(eval NAMESPACE=$(shell jq -r '.namespace' terraform/application/config/$(CONFIG).tfvars.json))
-	echo "Scaling worker to ${REPLICAS}"
-	kubectl -n ${NAMESPACE} scale deployment/${SERVICE_NAME}${DSUFFIX}-worker --replicas ${REPLICAS}
 
 .PHONY: test
 test: test-cluster
