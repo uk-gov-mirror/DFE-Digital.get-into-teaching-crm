@@ -1,7 +1,3 @@
-variable "cluster" {
-  type        = string
-  description = "AKS cluster where this app is deployed. Either 'test' or 'production'"
-}
 variable "namespace" {
   type        = string
   description = "AKS namespace where this app is deployed"

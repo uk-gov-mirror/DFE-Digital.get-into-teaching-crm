@@ -1,5 +1,5 @@
 ARM_TEMPLATE_TAG=1.1.16
-RG_TAGS={"Product" : "Teacher services cloud", "Service Offering" : "Teacher services cloud"}
+RG_TAGS={"Product" : "Get into Teaching Information Service CRM (GITIS)", "Service Offering" : "Get into Teaching Information Service CRM (GITIS)"}
 REGION=UK South
 SERVICE_NAME=get-into-teaching-crm
 SERVICE_SHORT=gitcrm
@@ -86,14 +86,6 @@ arm-mon-deployment: composed-variables set-azure-account
 deploy-monitoring-resources: arm-mon-deployment ## Validate ARM monitoring resource deployment. Usage: make env deploy-monitoring-resources
 
 validate-monitoring-resources: set-what-if arm-mon-deployment ## Validate ARM monitoring resource deployment. Usage: make env validate-monitoring-resources
-
-# test-cluster:
-# 	$(eval CLUSTER_RESOURCE_GROUP_NAME=s189t01-tsc-ts-rg)
-# 	$(eval CLUSTER_NAME=s189t01-tsc-test-aks)
-
-# production-cluster:
-# 	$(eval CLUSTER_RESOURCE_GROUP_NAME=s189p01-tsc-pd-rg)
-# 	$(eval CLUSTER_NAME=s189p01-tsc-production-aks)
 
 .PHONY: test
 test: 

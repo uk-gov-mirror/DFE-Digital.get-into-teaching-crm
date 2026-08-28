@@ -1,5 +1,4 @@
 CONFIG=development
-CLUSTER=test
 ENVIRONMENT=development
 CONFIG_SHORT=dv
 AZURE_SUBSCRIPTION=s189-teacher-services-cloud-test
