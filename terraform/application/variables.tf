@@ -1,7 +1,3 @@
-variable "namespace" {
-  type        = string
-  description = "AKS namespace where this app is deployed"
-}
 variable "environment" {
   type        = string
   description = "Name of the deployed environment in AKS"
@@ -72,12 +68,6 @@ variable "send_traffic_to_maintenance_page" {
 }
 
 variable "enable_logit" { default = true }
-
-variable "probe_path" {
-  type        = string
-  default     = "/healthcheck"
-  description = "Path for the liveness and startup probe. The probe can be disabled by setting this to null."
-}
 
 locals {
   postgres_ssl_mode = var.enable_postgres_ssl ? "require" : "disable"
