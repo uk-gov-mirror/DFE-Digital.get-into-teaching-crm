@@ -7,13 +7,7 @@ SERVICE_SHORT=gitcrm
 help:
 	@grep -E '^[a-zA-Z\._\-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: review
-review: test-cluster
-	$(if ${PR_NUMBER},,$(error Missing PR_NUMBER))
-	$(eval ENVIRONMENT=pr-${PR_NUMBER})
-	$(eval include global_config/review.sh)
-
-production: production-cluster
+production:
 	$(if $(or ${SKIP_CONFIRM}, ${CONFIRM_PRODUCTION}), , $(error Missing CONFIRM_PRODUCTION=yes))
 	$(eval include global_config/production.sh)
 
@@ -93,85 +87,18 @@ deploy-monitoring-resources: arm-mon-deployment ## Validate ARM monitoring resou
 
 validate-monitoring-resources: set-what-if arm-mon-deployment ## Validate ARM monitoring resource deployment. Usage: make env validate-monitoring-resources
 
-domains-infra-init: domains composed-variables set-azure-account
-	rm -rf terraform/domains/infrastructure/vendor/modules/domains
-	git clone --depth=1 --single-branch --branch ${TERRAFORM_MODULES_TAG} https://github.com/DFE-Digital/terraform-modules.git terraform/domains/infrastructure/vendor/modules/domains
+# test-cluster:
+# 	$(eval CLUSTER_RESOURCE_GROUP_NAME=s189t01-tsc-ts-rg)
+# 	$(eval CLUSTER_NAME=s189t01-tsc-test-aks)
 
-	terraform -chdir=terraform/domains/infrastructure init -reconfigure -upgrade \
-		-backend-config=resource_group_name=${RESOURCE_GROUP_NAME} \
-		-backend-config=storage_account_name=${STORAGE_ACCOUNT_NAME} \
-		-backend-config=key=domains_infrastructure.tfstate
-
-domains-infra-plan: domains domains-infra-init  ## Terraform plan for DNS infrastructure (DNS zone and front door). Usage: make domains-infra-plan
-	terraform -chdir=terraform/domains/infrastructure plan -var-file config/zones.tfvars.json
-
-domains-infra-apply: domains domains-infra-init  ## Terraform apply for DNS infrastructure (DNS zone and front door). Usage: make domains-infra-apply
-	terraform -chdir=terraform/domains/infrastructure apply -var-file config/zones.tfvars.json ${AUTO_APPROVE}
-
-domains-init: domains composed-variables set-azure-account
-	rm -rf terraform/domains/environment_domains/vendor/modules/domains
-	git clone --depth=1 --single-branch --branch ${TERRAFORM_MODULES_TAG} https://github.com/DFE-Digital/terraform-modules.git terraform/domains/environment_domains/vendor/modules/domains
-
-	terraform -chdir=terraform/domains/environment_domains init -upgrade -reconfigure \
-		-backend-config=resource_group_name=${RESOURCE_GROUP_NAME} \
-		-backend-config=storage_account_name=${STORAGE_ACCOUNT_NAME} \
-		-backend-config=key=${ENVIRONMENT}.tfstate
-
-domains-plan: domains-init  ## Terraform plan for DNS environment domains. Usage: make development domains-plan
-	terraform -chdir=terraform/domains/environment_domains plan -var-file config/${CONFIG}.tfvars.json
-
-domains-apply: domains-init ## Terraform apply for DNS environment domains. Usage: make development domains-apply
-	terraform -chdir=terraform/domains/environment_domains apply -var-file config/${CONFIG}.tfvars.json ${AUTO_APPROVE}
-
-test-cluster:
-	$(eval CLUSTER_RESOURCE_GROUP_NAME=s189t01-tsc-ts-rg)
-	$(eval CLUSTER_NAME=s189t01-tsc-test-aks)
-
-production-cluster:
-	$(eval CLUSTER_RESOURCE_GROUP_NAME=s189p01-tsc-pd-rg)
-	$(eval CLUSTER_NAME=s189p01-tsc-production-aks)
-
-bin/konduit.sh:
-	curl -s https://raw.githubusercontent.com/DFE-Digital/teacher-services-cloud/main/scripts/konduit.sh -o bin/konduit.sh \
-		&& chmod +x bin/konduit.sh
-
-action-group: set-azure-account # make production action-group ACTION_GROUP_EMAIL=notificationemail@domain.com . Must be run before setting enable_monitoring=true. Use any non-prod environment to create in the test subscription.
-	$(if $(ACTION_GROUP_EMAIL), , $(error Please specify a notification email for the action group))
-	az group create -l uksouth -g ${AZURE_RESOURCE_PREFIX}-${SERVICE_SHORT}-mn-rg --tags "Product=${SERVICE_NAME}"
-	az monitor action-group create -n ${AZURE_RESOURCE_PREFIX}-${SERVICE_NAME} -g ${AZURE_RESOURCE_PREFIX}-${SERVICE_SHORT}-mn-rg --action email ${AZURE_RESOURCE_PREFIX}-${SERVICE_SHORT}-email ${ACTION_GROUP_EMAIL}
-
-set-pgserver:
-	$(eval SERVERNAME=${AZURE_RESOURCE_PREFIX}-${SERVICE_SHORT}-${CONFIG_SHORT}-pg)
-
-list-pglogs: composed-variables set-pgserver set-azure-account
-	az postgres flexible-server server-logs list --resource-group ${RESOURCE_GROUP_NAME} --server-name ${SERVERNAME}
-
-download-pglogs: composed-variables set-pgserver set-azure-account
-	$(if $(LOG_NAME), , $(error Please specify a LOG_NAME for download))
-	az postgres flexible-server server-logs download --name ${LOG_NAME} --resource-group ${RESOURCE_GROUP_NAME} --server-name ${SERVERNAME}
-	ls -l $(LOG_NAME)*
-
-enable-pglogs: composed-variables set-pgserver set-azure-account
-	echo "Enabling server logs for PostgreSQL server ${SERVERNAME}"
-	echo "Current Value"
-	az postgres flexible-server parameter show --resource-group ${RESOURCE_GROUP_NAME} --server-name ${SERVERNAME} --name logfiles.download_enable --query value
-	echo "Setting Value"
-	az postgres flexible-server parameter set --resource-group ${RESOURCE_GROUP_NAME} --server-name ${SERVERNAME} --name logfiles.download_enable --value on
-	echo "New Value"
-	az postgres flexible-server parameter show --resource-group ${RESOURCE_GROUP_NAME} --server-name ${SERVERNAME} --name logfiles.download_enable --query value
-
-disable-pglogs: composed-variables set-pgserver set-azure-account
-	echo "Current Value"
-	az postgres flexible-server parameter show --resource-group ${RESOURCE_GROUP_NAME} --server-name ${SERVERNAME} --name logfiles.download_enable --query value
-	echo "Setting Value"
-	az postgres flexible-server parameter set --resource-group ${RESOURCE_GROUP_NAME} --server-name ${SERVERNAME} --name logfiles.download_enable --value off
-	echo "New Value"
-	az postgres flexible-server parameter show --resource-group ${RESOURCE_GROUP_NAME} --server-name ${SERVERNAME} --name logfiles.download_enable --query value
+# production-cluster:
+# 	$(eval CLUSTER_RESOURCE_GROUP_NAME=s189p01-tsc-pd-rg)
+# 	$(eval CLUSTER_NAME=s189p01-tsc-production-aks)
 
 .PHONY: test
-test: test-cluster
+test: 
 	$(eval include global_config/test.sh)
 
 .PHONY: development
-development: test-cluster
+development: 
 	$(eval include global_config/development.sh)
