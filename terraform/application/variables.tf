@@ -1,6 +1,6 @@
 variable "environment" {
   type        = string
-  description = "Name of the deployed environment in AKS"
+  description = "Name of the deployed environment"
 }
 variable "azure_resource_prefix" {
   type        = string
@@ -22,11 +22,6 @@ variable "service_short" {
   type        = string
   description = "Short name to identify the service. Up to 6 charcters."
 }
-variable "deploy_azure_backing_services" {
-  type        = bool
-  default     = true
-  description = "Deploy real Azure backing services like databases, as opposed to containers inside of AKS"
-}
 variable "enable_postgres_ssl" {
   type        = bool
   default     = true
@@ -40,6 +35,7 @@ variable "enable_postgres_backup_storage" {
 variable "docker_image" {
   type        = string
   description = "Docker image full name to identify it in the registry. Includes docker registry, repository and tag e.g.: ghcr.io/dfe-digital/teacher-pay-calculator:673f6309fd0c907014f44d6732496ecd92a2bcd0"
+  default     = null
 }
 variable "external_url" {
   type        = string
@@ -69,8 +65,37 @@ variable "send_traffic_to_maintenance_page" {
 
 variable "enable_logit" { default = true }
 
+variable "blob_delete_after_days" {
+  type        = number
+  description = "Number of days after which blobs will be deleted. Set to 0 to disable automatic deletion."
+  default     = 7
+  validation {
+    condition     = var.blob_delete_after_days >= 0 && var.blob_delete_after_days <= 9999
+    error_message = "The blob_delete_after_days must be between 0 and 9999. Set to 0 to disable."
+  }
+}
+
+variable "blob_delete_retention_days" {
+  type        = number
+  description = "Number of days to retain deleted blobs. Set to null to disable retention policy."
+  default     = null
+  validation {
+    condition     = var.blob_delete_retention_days == null ? true : (var.blob_delete_retention_days >= 1 && var.blob_delete_retention_days <= 365)
+    error_message = "The blob_delete_retention_days must be between 1 and 365, or null to disable retention policy"
+  }
+}
+
+variable "container_delete_retention_days" {
+  type        = number
+  description = "Number of days to retain deleted containers. Set to null to disable retention policy."
+  default     = null
+  validation {
+    condition     = var.container_delete_retention_days == null ? true : (var.container_delete_retention_days >= 1 && var.container_delete_retention_days <= 365)
+    error_message = "The container_delete_retention_days must be between 1 and 365, or null to disable retention policy"
+  }
+}
+
 locals {
   postgres_ssl_mode = var.enable_postgres_ssl ? "require" : "disable"
 
 }
-
