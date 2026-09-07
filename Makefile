@@ -27,13 +27,13 @@ set-azure-account:
 
 terraform-init: composed-variables set-azure-account
 
-	rm -rf terraform/application/vendor/modules/aks
-	git -c advice.detachedHead=false clone --depth=1 --single-branch --branch ${TERRAFORM_MODULES_TAG} https://github.com/DFE-Digital/terraform-modules.git terraform/application/vendor/modules/aks
+	rm -rf terraform/application/vendor/modules/azure
+	git -c advice.detachedHead=false clone --depth=1 --single-branch --branch ${TERRAFORM_MODULES_TAG} https://github.com/DFE-Digital/terraform-modules.git terraform/application/vendor/modules/azure
 
 	terraform -chdir=terraform/application init -upgrade -reconfigure \
 		-backend-config=resource_group_name=${RESOURCE_GROUP_NAME} \
 		-backend-config=storage_account_name=${STORAGE_ACCOUNT_NAME} \
-		-backend-config=key=${ENVIRONMENT}_kubernetes.tfstate
+		-backend-config=key=${ENVIRONMENT}_iac.tfstate
 
 	$(eval export TF_VAR_environment=${ENVIRONMENT})
 	$(eval export TF_VAR_azure_resource_prefix=${AZURE_RESOURCE_PREFIX})
@@ -88,9 +88,9 @@ deploy-monitoring-resources: arm-mon-deployment ## Validate ARM monitoring resou
 validate-monitoring-resources: set-what-if arm-mon-deployment ## Validate ARM monitoring resource deployment. Usage: make env validate-monitoring-resources
 
 .PHONY: test
-test: 
+test:
 	$(eval include global_config/test.sh)
 
 .PHONY: development
-development: 
+development:
 	$(eval include global_config/development.sh)
